@@ -24,4 +24,5 @@ COPY . .
 WORKDIR /app
 
 # Точка входа
-CMD ["python", "bot/main.py"]
+CMD ["python", "-m", "bot.main"]
+
