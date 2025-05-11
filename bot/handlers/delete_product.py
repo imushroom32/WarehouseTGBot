@@ -13,6 +13,7 @@ from bot.models import Product, Stock
 
 SELECT_PRODUCT = 0
 
+
 async def delete_product_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
@@ -36,12 +37,13 @@ async def delete_product_start(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.edit_message_text("🗑️ Выберите товар для удаления:", reply_markup=InlineKeyboardMarkup(keyboard))
     return SELECT_PRODUCT
 
+
 async def confirm_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
 
-    if not query.data.isdigit():            # ← дополнительная защита
-        return SELECT_PRODUCT               # игнорируем «не‑число»
+    if not query.data.isdigit():  # ← дополнительная защита
+        return SELECT_PRODUCT  # игнорируем «не‑число»
 
     pid = int(query.data)
 
@@ -61,6 +63,7 @@ async def confirm_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     ]
     await query.message.reply_text("Что дальше?", reply_markup=InlineKeyboardMarkup(keyboard))
     return ConversationHandler.END
+
 
 def get_handler() -> ConversationHandler:
     return ConversationHandler(

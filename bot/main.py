@@ -30,6 +30,12 @@ def main() -> None:
     for h in start_handlers():
         app.add_handler(h)
 
+    async def error_handler(update, context):
+        import traceback
+        print("❌ Ошибка:", traceback.format_exc())
+
+    app.add_error_handler(error_handler)
+
     app.run_polling()
 
 

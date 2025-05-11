@@ -7,6 +7,7 @@ Base = declarative_base()
 engine = create_engine(DATABASE_URL, echo=True)
 Session = scoped_session(sessionmaker(bind=engine))
 
+
 def init_db():
     """Создаёт все таблицы в базе, если их ещё нет."""
     Base.metadata.create_all(engine)

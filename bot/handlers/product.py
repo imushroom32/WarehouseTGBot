@@ -18,8 +18,9 @@ from bot.models import Product
 # состояние разговора
 ENTER_NAME = 0
 
+
 async def add_product_start(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
+        update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """
     Шаг 1: Запрашивает название нового товара.
@@ -28,6 +29,7 @@ async def add_product_start(
     await query.answer()
     await query.edit_message_text("🆕 Введите название товара:")
     return ENTER_NAME
+
 
 async def add_product_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     name = update.message.text.strip()
@@ -56,6 +58,7 @@ async def add_product_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     finally:
         session.close()
     return ConversationHandler.END
+
 
 def get_handler() -> ConversationHandler:
     """

@@ -11,7 +11,7 @@ _MANAGER = [
 
 _EMPLOYEE = [
     [InlineKeyboardButton("📦 Мои остатки", callback_data="show_stock")],
-    [InlineKeyboardButton("🗑️ Списать",     callback_data="write_off")],
+    [InlineKeyboardButton("🗑️ Списать", callback_data="write_off")],
 ]
 
 
@@ -20,7 +20,8 @@ def main_menu_markup(role: str) -> InlineKeyboardMarkup:
     btns = btns + [[InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]]
     return InlineKeyboardMarkup(btns)
 
+
 def home_kb():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu") ]
+        [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
     ])

@@ -1,17 +1,19 @@
 # bot/handlers/stock_list.py
+from sqlalchemy import func
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackQueryHandler, ContextTypes
-from sqlalchemy import func
+
 from bot.db import Session
 from bot.keyboards import home_kb
 from bot.models import User, Product, Stock
 
 EMP, PROD = "show_stock_emp", "show_stock_prod"
 
+
 async def show_stock(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
-    data = query.data                            # какой callback прилетел?
+    data = query.data  # какой callback прилетел?
 
     session = Session()
     cur_user = session.query(User).filter_by(
@@ -42,8 +44,8 @@ async def show_stock(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if data == "show_stock":
         kb = [
             [InlineKeyboardButton("👤 По сотрудникам", callback_data=EMP)],
-            [InlineKeyboardButton("📦 По товарам",    callback_data=PROD)],
-            [InlineKeyboardButton("🏠 Главное меню",  callback_data="main_menu")],
+            [InlineKeyboardButton("📦 По товарам", callback_data=PROD)],
+            [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")],
         ]
         await query.edit_message_text(
             "Как представить остатки?", reply_markup=InlineKeyboardMarkup(kb)
@@ -56,7 +58,7 @@ async def show_stock(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         rows = (
             session.query(User.full_name, Product.name, func.sum(Stock.quantity))
             .select_from(Stock)
-            .join(User,    User.id == Stock.user_id)
+            .join(User, User.id == Stock.user_id)
             .join(Product, Product.id == Stock.product_id)
             .group_by(User.full_name, Product.name)
             .order_by(User.full_name, Product.name)
@@ -87,7 +89,7 @@ async def show_stock(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             )
             .select_from(Stock)
             .join(Product, Stock.product_id == Product.id)
-            .outerjoin(User,   User.id == Stock.user_id)        # NULL = ничейный
+            .outerjoin(User, User.id == Stock.user_id)  # NULL = ничейный
             .group_by(Product.id, Stock.user_id, User.full_name)
             .order_by(Product.name, User.full_name.nullsfirst())
             .all()
@@ -106,6 +108,7 @@ async def show_stock(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             out.append(f" • {holder}: <code>{qty} шт.</code>")
         await query.edit_message_text("\n".join(out), parse_mode="HTML", reply_markup=home_kb())
         return
+
 
 # ── handler registration ────────────────────────────────────────────────────
 def get_handler() -> CallbackQueryHandler:

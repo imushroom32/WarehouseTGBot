@@ -18,8 +18,9 @@ from bot.models import Product, Stock
 # состояния разговора
 SELECT_PRODUCT, ENTER_QTY = range(2)
 
+
 async def add_stock_start(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
+        update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """
     Шаг 1: Предлагает выбрать товар для пополнения.
@@ -40,8 +41,9 @@ async def add_stock_start(
     )
     return SELECT_PRODUCT
 
+
 async def select_product(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
+        update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """
     Шаг 2: Сохраняет выбранный товар и запрашивает количество.
@@ -61,7 +63,7 @@ async def select_product(
 
 
 async def enter_qty(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
+        update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """
     Шаг 3: Обновляет или создаёт запись Stock.
@@ -99,9 +101,9 @@ async def enter_qty(
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Вы можете вернуться в главное меню:", reply_markup=reply_markup)
 
-
     session.close()
     return ConversationHandler.END
+
 
 def get_handler() -> ConversationHandler:
     """

@@ -20,9 +20,11 @@ from bot.models import User, Product, Stock
 # ── состояния ────────────────────────────────────────────────────────────────
 SELECT_PRODUCT, SELECT_EMPLOYEE, ENTER_QTY = range(3)
 
+
 # ── Шаг 1. выбор товара с незанятыми остатками ──────────────────────────────
 async def transfer_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
-    q = update.callback_query; await q.answer()
+    q = update.callback_query;
+    await q.answer()
 
     session = Session()
     products = (
@@ -43,18 +45,20 @@ async def transfer_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     await q.edit_message_text("📦 Выберите товар для передачи:", reply_markup=InlineKeyboardMarkup(kb))
     return SELECT_PRODUCT
 
+
 # ── Шаг 2. выбор сотрудника ─────────────────────────────────────────────────
 async def select_product(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
-    q = update.callback_query; await q.answer()
+    q = update.callback_query;
+    await q.answer()
     pid = int(q.data)
     ctx.user_data["product_id"] = pid
 
     session = Session()
     total_free = (
-        session.query(func.sum(Stock.quantity))
-        .filter(Stock.product_id == pid, Stock.user_id.is_(None))
-        .scalar()
-    ) or 0
+                     session.query(func.sum(Stock.quantity))
+                     .filter(Stock.product_id == pid, Stock.user_id.is_(None))
+                     .scalar()
+                 ) or 0
 
     employees = (
         session.query(User)
@@ -76,14 +80,17 @@ async def select_product(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     )
     return SELECT_EMPLOYEE
 
+
 # ── Шаг 3. ввод количества ──────────────────────────────────────────────────
 async def select_employee(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
-    q = update.callback_query; await q.answer()
+    q = update.callback_query;
+    await q.answer()
     ctx.user_data["employee_id"] = int(q.data)
     available = ctx.user_data["available_qty"]
 
     await q.edit_message_text(f"🔢 Введите количество (доступно: {available} шт.):")
     return ENTER_QTY
+
 
 async def enter_qty(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     text = update.message.text
@@ -138,14 +145,15 @@ async def enter_qty(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text("✅ Передача выполнена.", reply_markup=home_kb())
     return ConversationHandler.END
 
+
 # ── Конструктор хендлера ─────────────────────────────────────────────────────
 def get_handler() -> ConversationHandler:
     return ConversationHandler(
         entry_points=[CallbackQueryHandler(transfer_start, pattern="^transfer_stock$")],
         states={
-            SELECT_PRODUCT:  [CallbackQueryHandler(select_product, pattern=r"^\d+$")],
+            SELECT_PRODUCT: [CallbackQueryHandler(select_product, pattern=r"^\d+$")],
             SELECT_EMPLOYEE: [CallbackQueryHandler(select_employee, pattern=r"^\d+$")],
-            ENTER_QTY:       [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_qty)],
+            ENTER_QTY: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_qty)],
         },
         fallbacks=[],
     )

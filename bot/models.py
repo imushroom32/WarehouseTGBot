@@ -4,18 +4,18 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 
-from bot.config import MANAGER_TELEGRAM_ID
+from bot.config import MANAGER_TELEGRAM_IDS
 from bot.db import Base
 
 
 class User(Base):
     __tablename__ = "users"
 
-    id          = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True)
     telegram_id = Column(String(64), unique=True, nullable=False)
-    full_name   = Column(String(128))
-    role        = Column(String(16))            # "manager" | "employee"
-    created_at  = Column(DateTime, default=datetime.now)
+    full_name = Column(String(128))
+    role = Column(String(16))  # "manager" | "employee"
+    created_at = Column(DateTime, default=datetime.now)
 
     stocks = relationship("Stock", back_populates="user")
 
@@ -24,7 +24,7 @@ class User(Base):
         uid = str(tg_user.id)
 
         user = session.query(User).filter_by(telegram_id=uid).one_or_none()
-        desired_role = "manager" if uid in MANAGER_TELEGRAM_ID else "employee"
+        desired_role = "manager" if uid in MANAGER_TELEGRAM_IDS else "employee"
 
         if user:
             # ▶ если роль изменилась — обновим
@@ -43,24 +43,26 @@ class User(Base):
         session.commit()
         return user
 
+
 class Product(Base):
     __tablename__ = "products"
 
-    id   = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False, unique=True)
     created_at = Column(DateTime, default=datetime.now)
 
     stocks = relationship("Stock", back_populates="product")
 
+
 class Stock(Base):
     __tablename__ = "stocks"
 
-    id        = Column(Integer, primary_key=True)
-    product_id= Column(Integer, ForeignKey("products.id"), nullable=False)
-    user_id   = Column(Integer, ForeignKey("users.id"))   # ← nullable: складской «ничей»
-    quantity  = Column(Integer, default=0, nullable=False)
-    created_at= Column(DateTime, default=datetime.now)
-    updated_at= Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    id = Column(Integer, primary_key=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"))  # ← nullable: складской «ничей»
+    quantity = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     product = relationship("Product", back_populates="stocks")
-    user    = relationship("User",    back_populates="stocks")
+    user = relationship("User", back_populates="stocks")

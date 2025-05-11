@@ -18,14 +18,15 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
-from sqlalchemy import func
+
+from bot.config import MANAGER_TELEGRAM_IDS
 from bot.db import Session
 from bot.keyboards import home_kb
 from bot.models import User, Product, Stock
-from bot.config import MANAGER_TELEGRAM_ID
 
 # ── состояния диалога ────────────────────────────────────────────────
 CHOOSE_EMPLOYEE, CHOOSE_PRODUCT, ENTER_QTY, ENTER_REASON = range(4)
+
 
 # ─────────────────────────────────────────────────────────────────────
 async def writeoff_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
@@ -66,6 +67,7 @@ async def writeoff_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     await q.edit_message_text("👤 Выберите источник списания:", reply_markup=InlineKeyboardMarkup(kb))
     return CHOOSE_EMPLOYEE
 
+
 # ─────────────────────────────────────────────────────────────────────
 async def select_employee(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     q = update.callback_query
@@ -73,7 +75,10 @@ async def select_employee(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int
 
     if q.data == "unassigned":
         ctx.user_data["target_uid"] = None
-        return await _show_products(q, ctx)
+    else:
+        ctx.user_data["target_uid"] = int(q.data)  # ← вот этого не хватает
+
+    return await _show_products(q, ctx)  # ← обязательно вернуться в поток
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -99,11 +104,12 @@ async def _show_products(query, ctx) -> int:
         [InlineKeyboardButton(f"{s.product.name}: {s.quantity} шт.", callback_data=str(s.id))]
         for s in stocks
     ]
-    session.close()                                        # ← закрываем ПОСЛЕ использования
+    session.close()  # ← закрываем ПОСЛЕ использования
 
     full_kb = InlineKeyboardMarkup(kb + list(home_kb().inline_keyboard))
     await query.edit_message_text("📦 Выберите товар:", reply_markup=full_kb)
     return CHOOSE_PRODUCT
+
 
 # ─────────────────────────────────────────────────────────────────────
 async def select_product(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
@@ -120,6 +126,7 @@ async def select_product(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     ctx.user_data["available_qty"] = stock.quantity
     await q.edit_message_text(f"🔢 Введите количество (доступно: {stock.quantity} шт.):")
     return ENTER_QTY
+
 
 # ─────────────────────────────────────────────────────────────────────
 async def enter_qty(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
@@ -138,10 +145,11 @@ async def enter_qty(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text("📝 Укажите причину списания:")
     return ENTER_REASON
 
+
 # ─────────────────────────────────────────────────────────────────────
 async def enter_reason(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     reason = update.message.text
-    qty    = ctx.user_data["writeoff_qty"]
+    qty = ctx.user_data["writeoff_qty"]
     stock_id = ctx.user_data["stock_id"]
 
     session = Session()
@@ -159,16 +167,17 @@ async def enter_reason(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
 
     # ── уведомление менеджеру ─────────────────────────────────────────
     try:
-        await update.get_bot().send_message(
-            MANAGER_TELEGRAM_ID,
+        (await update.get_bot().send_message(
+            _id,
             f"🔔 <b>{user_fullname}</b> списал {qty} шт. <i>{product_name}</i>.\nПричина: {reason}",
             parse_mode="HTML",
-        )
+        ) for _id in MANAGER_TELEGRAM_IDS)
     except Exception:
         # молча игнорируем, если бот у менеджера не запущен
         pass
 
     return ConversationHandler.END
+
 
 # ─────────────────────────────────────────────────────────────────────
 def get_handler() -> ConversationHandler:
@@ -176,9 +185,9 @@ def get_handler() -> ConversationHandler:
         entry_points=[CallbackQueryHandler(writeoff_start, pattern="^write_off$")],
         states={
             CHOOSE_EMPLOYEE: [CallbackQueryHandler(select_employee, pattern=r"^\d+$|^unassigned$")],
-            CHOOSE_PRODUCT:  [CallbackQueryHandler(select_product, pattern="^\d+$")],
-            ENTER_QTY:       [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_qty)],
-            ENTER_REASON:    [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_reason)],
+            CHOOSE_PRODUCT: [CallbackQueryHandler(select_product, pattern="^\d+$")],
+            ENTER_QTY: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_qty)],
+            ENTER_REASON: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_reason)],
         },
         fallbacks=[],
     )
