@@ -71,26 +71,9 @@ async def select_employee(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int
     q = update.callback_query
     await q.answer()
 
-    session = Session()
-    current = session.query(User).filter_by(telegram_id=str(q.from_user.id)).one()
-    session.close()
-
-    # 🔒 сотруднику нельзя списывать склад
     if q.data == "unassigned":
-        if current.role == "employee":
-            await q.edit_message_text("❗ У вас нет доступа к складским остаткам.", reply_markup=home_kb())
-            return ConversationHandler.END
         ctx.user_data["target_uid"] = None
         return await _show_products(q, ctx)
-
-    # 🔒 сотруднику — только себя
-    uid = int(q.data)
-    if current.role == "employee" and current.id != uid:
-        await q.edit_message_text("❗ У вас нет прав на списание чужих остатков.", reply_markup=home_kb())
-        return ConversationHandler.END
-
-    ctx.user_data["target_uid"] = uid
-    return await _show_products(q, ctx)
 
 
 # ─────────────────────────────────────────────────────────────────────
