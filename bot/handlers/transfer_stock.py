@@ -143,8 +143,8 @@ def get_handler() -> ConversationHandler:
     return ConversationHandler(
         entry_points=[CallbackQueryHandler(transfer_start, pattern="^transfer_stock$")],
         states={
-            SELECT_PRODUCT:  [CallbackQueryHandler(select_product)],
-            SELECT_EMPLOYEE: [CallbackQueryHandler(select_employee)],
+            SELECT_PRODUCT:  [CallbackQueryHandler(select_product, pattern=r"^\d+$")],
+            SELECT_EMPLOYEE: [CallbackQueryHandler(select_employee, pattern=r"^\d+$")],
             ENTER_QTY:       [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_qty)],
         },
         fallbacks=[],

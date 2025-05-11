@@ -29,44 +29,69 @@ CHOOSE_EMPLOYEE, CHOOSE_PRODUCT, ENTER_QTY, ENTER_REASON = range(4)
 
 # ─────────────────────────────────────────────────────────────────────
 async def writeoff_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
-    """Первый шаг: определяем роль инициатора."""
     q = update.callback_query
     await q.answer()
 
     session = Session()
     current = session.query(User).filter_by(telegram_id=str(q.from_user.id)).one()
+    uid = current.id
+    role = current.role
 
     # сотрудник → сразу к списку его товаров
-    if current.role == "employee":
-        ctx.user_data["target_uid"] = current.id
+    if role == "employee":
+        ctx.user_data["target_uid"] = uid
         session.close()
         return await _show_products(q, ctx)
 
-    # менеджер → выбор сотрудника
+    # менеджер → показать выбор
     employees = (
         session.query(User)
-        .join(Stock)                      # есть остатки
+        .join(Stock)
         .filter(User.role == "employee", Stock.quantity > 0)
         .group_by(User.id)
         .order_by(User.full_name)
         .all()
     )
+    has_unassigned = session.query(Stock).filter(Stock.user_id.is_(None), Stock.quantity > 0).count() > 0
     session.close()
 
-    if not employees:
-        await q.edit_message_text("❗ У сотрудников нет остатков для списания.")
+    if not employees and not has_unassigned:
+        await q.edit_message_text("❗ Нет остатков для списания.")
         return ConversationHandler.END
 
     kb = [[InlineKeyboardButton(e.full_name, callback_data=str(e.id))] for e in employees]
-    await q.edit_message_text("👤 Выберите сотрудника:", reply_markup=InlineKeyboardMarkup(kb))
+    if has_unassigned:
+        kb.append([InlineKeyboardButton("📦 Склад (без ответственного)", callback_data="unassigned")])
+
+    await q.edit_message_text("👤 Выберите источник списания:", reply_markup=InlineKeyboardMarkup(kb))
     return CHOOSE_EMPLOYEE
 
 # ─────────────────────────────────────────────────────────────────────
 async def select_employee(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     q = update.callback_query
     await q.answer()
-    ctx.user_data["target_uid"] = int(q.data)
+
+    session = Session()
+    current = session.query(User).filter_by(telegram_id=str(q.from_user.id)).one()
+    session.close()
+
+    # 🔒 сотруднику нельзя списывать склад
+    if q.data == "unassigned":
+        if current.role == "employee":
+            await q.edit_message_text("❗ У вас нет доступа к складским остаткам.", reply_markup=home_kb())
+            return ConversationHandler.END
+        ctx.user_data["target_uid"] = None
+        return await _show_products(q, ctx)
+
+    # 🔒 сотруднику — только себя
+    uid = int(q.data)
+    if current.role == "employee" and current.id != uid:
+        await q.edit_message_text("❗ У вас нет прав на списание чужих остатков.", reply_markup=home_kb())
+        return ConversationHandler.END
+
+    ctx.user_data["target_uid"] = uid
     return await _show_products(q, ctx)
+
 
 # ─────────────────────────────────────────────────────────────────────
 async def _show_products(query, ctx) -> int:
@@ -77,7 +102,7 @@ async def _show_products(query, ctx) -> int:
         session.query(Stock)
         .options(joinedload(Stock.product))
         .join(Product, Stock.product_id == Product.id)  # ← явный JOIN
-        .filter(Stock.user_id == uid, Stock.quantity > 0)
+        .filter((Stock.user_id == uid) if uid is not None else Stock.user_id.is_(None), Stock.quantity > 0)
         .order_by(Product.name)  # теперь колонка существует
         .all()
     )
@@ -139,7 +164,7 @@ async def enter_reason(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     session = Session()
     stock = session.query(Stock).get(stock_id)
     product_name = stock.product.name
-    user_fullname = stock.user.full_name
+    user_fullname = stock.user.full_name if stock.user else "Склад"
     # списываем
     stock.quantity -= qty
     if stock.quantity == 0:
@@ -147,7 +172,7 @@ async def enter_reason(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     session.commit()
     session.close()
 
-    await update.message.reply_text(f"✅ Списано {qty} шт. ({product_name}).")
+    await update.message.reply_text(f"✅ Списано {qty} шт. ({product_name}).", reply_markup=home_kb())
 
     # ── уведомление менеджеру ─────────────────────────────────────────
     try:
@@ -167,8 +192,8 @@ def get_handler() -> ConversationHandler:
     return ConversationHandler(
         entry_points=[CallbackQueryHandler(writeoff_start, pattern="^write_off$")],
         states={
-            CHOOSE_EMPLOYEE: [CallbackQueryHandler(select_employee)],
-            CHOOSE_PRODUCT:  [CallbackQueryHandler(select_product)],
+            CHOOSE_EMPLOYEE: [CallbackQueryHandler(select_employee, pattern=r"^\d+$|^unassigned$")],
+            CHOOSE_PRODUCT:  [CallbackQueryHandler(select_product, pattern="^\d+$")],
             ENTER_QTY:       [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_qty)],
             ENTER_REASON:    [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_reason)],
         },
