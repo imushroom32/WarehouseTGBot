@@ -185,9 +185,9 @@ def get_handler() -> ConversationHandler:
         entry_points=[CallbackQueryHandler(writeoff_start, pattern="^write_off$")],
         states={
             CHOOSE_EMPLOYEE: [CallbackQueryHandler(select_employee, pattern=r"^\d+$|^unassigned$")],
-            CHOOSE_PRODUCT: [CallbackQueryHandler(select_product, pattern="^\d+$")],
-            ENTER_QTY: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_qty)],
-            ENTER_REASON: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_reason)],
+            CHOOSE_PRODUCT:  [CallbackQueryHandler(select_product, pattern=r"^\d+$")],
+            ENTER_QTY:       [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_qty)],
+            ENTER_REASON:    [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_reason)],
         },
         fallbacks=[],
     )

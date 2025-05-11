@@ -93,6 +93,10 @@ async def select_employee(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int
 
 
 async def enter_qty(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    if not update.message:
+        await update.effective_chat.send_message("❗ Не удалось прочитать сообщение. Попробуйте ещё раз.")
+        return ENTER_QTY
+
     text = update.message.text
     try:
         qty = int(text)
