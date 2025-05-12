@@ -13,7 +13,7 @@ from telegram.ext import (
 
 from bot.db import Session
 from bot.keyboards import home_kb
-from bot.models import Product, Stock
+from bot.models import Product, Stock, Log
 
 # состояния разговора
 SELECT_PRODUCT, ENTER_QTY = range(2)
@@ -101,6 +101,13 @@ async def enter_qty(
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Вы можете вернуться в главное меню:", reply_markup=reply_markup)
 
+    log = Log(
+        action="add_stock",
+        user_id=str(update.effective_user.id),
+        info=f"Пополнено: {product.name} +{qty} шт. Итого: {stock.quantity} шт."
+    )
+    session.add(log)
+    session.commit()
     session.close()
     return ConversationHandler.END
 

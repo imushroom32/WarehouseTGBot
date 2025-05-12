@@ -22,7 +22,8 @@ from telegram.ext import (
 from bot.config import MANAGER_TELEGRAM_IDS
 from bot.db import Session
 from bot.keyboards import home_kb
-from bot.models import User, Product, Stock
+from bot.models import User, Product, Stock, Log
+from bot.db import Session as LogSession
 
 # ── состояния диалога ────────────────────────────────────────────────
 CHOOSE_EMPLOYEE, CHOOSE_PRODUCT, ENTER_QTY, ENTER_REASON = range(4)
@@ -160,8 +161,16 @@ async def enter_reason(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     stock.quantity -= qty
     if stock.quantity == 0:
         session.delete(stock)
-    session.commit()
-    session.close()
+
+    log_session = LogSession()
+    log = Log(
+        action="writeoff",
+        user_id=str(update.effective_user.id),
+        info=f"Списано {qty} шт. {product_name} ({user_fullname}). Причина: {reason}"
+    )
+    log_session.add(log)
+    log_session.commit()
+    log_session.close()
 
     await update.message.reply_text(f"✅ Списано {qty} шт. ({product_name}).", reply_markup=home_kb())
 

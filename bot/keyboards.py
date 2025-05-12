@@ -7,6 +7,7 @@ _MANAGER = [
      InlineKeyboardButton("📦 Передать сотруднику", callback_data="transfer_stock")],
     [InlineKeyboardButton("📊 Все остатки", callback_data="show_stock")],
     [InlineKeyboardButton("🗑️ Списать у сотрудника", callback_data="write_off")],
+    [InlineKeyboardButton("📄 Отчёт", callback_data="report")],  # ← вот она
 ]
 
 _EMPLOYEE = [

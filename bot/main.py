@@ -9,6 +9,8 @@ from bot.handlers.stock import get_handler as stock_add_h
 from bot.handlers.stock_list import get_handler as stock_list_h
 from bot.handlers.transfer_stock import get_handler as transfer_h
 from bot.handlers.writeoff import get_handler as writeoff_h
+from bot.handlers.report import get_handler as report_h
+
 
 
 def main() -> None:
@@ -26,6 +28,7 @@ def main() -> None:
     app.add_handler(writeoff_h())
     app.add_handler(delete_product_h())
     app.add_handler(transfer_h())
+    app.add_handler(report_h())
 
     for h in start_handlers():
         app.add_handler(h)

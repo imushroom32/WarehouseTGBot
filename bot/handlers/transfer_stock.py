@@ -2,6 +2,9 @@
 """
 Менеджер передаёт свободные складские остатки (user_id = None) конкретному сотруднику.
 """
+import asyncio
+import traceback
+from datetime import datetime
 
 from sqlalchemy import func
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -15,7 +18,7 @@ from telegram.ext import (
 
 from bot.db import Session
 from bot.keyboards import home_kb
-from bot.models import User, Product, Stock
+from bot.models import User, Product, Stock, Log
 
 # ── состояния ────────────────────────────────────────────────────────────────
 SELECT_PRODUCT, SELECT_EMPLOYEE, ENTER_QTY = range(3)
@@ -93,65 +96,88 @@ async def select_employee(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int
 
 
 async def enter_qty(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
-    if not update.message:
-        await update.effective_chat.send_message("❗ Не удалось прочитать сообщение. Попробуйте ещё раз.")
-        return ENTER_QTY
-
-    text = update.message.text
     try:
-        qty = int(text)
-        if qty <= 0:
-            raise ValueError
-    except ValueError:
-        await update.message.reply_text("❗ Введите целое положительное число!")
-        return ENTER_QTY
+        if not update.message:
+            await update.effective_chat.send_message("❗ Не удалось прочитать сообщение. Попробуйте ещё раз.")
+            return ENTER_QTY
 
-    pid = ctx.user_data["product_id"]
-    uid = ctx.user_data["employee_id"]
-    available = ctx.user_data["available_qty"]
+        text = update.message.text
+        try:
+            qty = int(text)
+            if qty <= 0:
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("❗ Введите целое положительное число!")
+            return ENTER_QTY
 
-    if qty > available:
-        await update.message.reply_text(f"❗ Недостаточно: доступно {available} шт.")
-        return ENTER_QTY
+        pid = ctx.user_data["product_id"]
+        uid = ctx.user_data["employee_id"]
+        available = ctx.user_data["available_qty"]
 
-    # ── транзакция ────────────────────────────────────────────────────────────
-    session = Session()
+        if qty > available:
+            await update.message.reply_text(f"❗ Недостаточно: доступно {available} шт.")
+            return ENTER_QTY
 
-    # 1. добавляем/увеличиваем запись сотрудника
-    rec = session.query(Stock).filter_by(product_id=pid, user_id=uid).first()
-    if rec:
-        rec.quantity += qty
-    else:
-        rec = Stock(product_id=pid, user_id=uid, quantity=qty)
-        session.add(rec)
+        # ── транзакция ───────────────────────────────
+        session = Session()
 
-    # 2. вычитаем из «ничейных» остатков
-    remaining = qty
-    free_stocks = (
-        session.query(Stock)
-        .filter_by(product_id=pid, user_id=None)
-        .order_by(Stock.id)
-        .all()
-    )
-    for s in free_stocks:
-        if remaining <= 0:
-            break
-        if s.quantity > remaining:
-            s.quantity -= remaining
-            remaining = 0
+        rec = session.query(Stock).filter_by(product_id=pid, user_id=uid).first()
+        if rec:
+            rec.quantity += qty
         else:
-            remaining -= s.quantity
-            session.delete(s)
+            rec = Stock(product_id=pid, user_id=uid, quantity=qty)
+            session.add(rec)
 
-    session.commit()
-    session.close()
+        remaining = qty
+        free_stocks = (
+            session.query(Stock)
+            .filter_by(product_id=pid, user_id=None)
+            .order_by(Stock.id)
+            .all()
+        )
+        for s in free_stocks:
+            if remaining <= 0:
+                break
+            if s.quantity > remaining:
+                s.quantity -= remaining
+                remaining = 0
+            else:
+                remaining -= s.quantity
+                session.delete(s)
 
-    if update.message:
-        await update.message.reply_text("✅ Передача выполнена.", reply_markup=home_kb())
-    else:
-        await update.effective_chat.send_message("✅ Передача выполнена.", reply_markup=home_kb())
+        product = session.get(Product, pid)
+        recipient = session.get(User, uid)
 
-    return ConversationHandler.END
+        # Пробуем безопасное логирование в файл
+        with open("/tmp/warehouse_log.txt", "a") as f:
+            f.write(f"{datetime.now()} | Передано {qty} шт. {product.name} → {recipient.full_name}\n")
+
+        session.commit()
+        session.close()
+
+        # Диагностика
+        print("[DEBUG] Передача выполнена — пытаемся отправить сообщение")
+
+        try:
+            if update.message:
+                await asyncio.wait_for(
+                    update.message.reply_text("✅ Передача выполнена.", reply_markup=home_kb()),
+                    timeout=5
+                )
+            else:
+                await asyncio.wait_for(
+                    update.effective_chat.send_message("✅ Передача выполнена.", reply_markup=home_kb()),
+                    timeout=5
+                )
+        except asyncio.TimeoutError:
+            print("‼️ Timeout при отправке сообщения Telegram")
+
+        return ConversationHandler.END
+
+    except Exception:
+        print("‼️ ОБЩАЯ ОШИБКА В enter_qty:")
+        print(traceback.format_exc())
+        return ENTER_QTY
 
 
 # ── Конструктор хендлера ─────────────────────────────────────────────────────

@@ -13,7 +13,7 @@ from telegram.ext import (
 
 from bot.db import Session
 from bot.keyboards import home_kb
-from bot.models import Product
+from bot.models import Product, Log
 
 # состояние разговора
 ENTER_NAME = 0
@@ -38,6 +38,14 @@ async def add_product_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     try:
         product = Product(name=name)
         session.add(product)
+
+        log = Log(
+            action="add_product",
+            user_id=str(update.effective_user.id),
+            info=f"Добавлен товар: {name}"
+        )
+        session.add(log)
+
         session.commit()
         await update.message.reply_text(f"✅ Товар «{name}» добавлен!", reply_markup=home_kb())
 

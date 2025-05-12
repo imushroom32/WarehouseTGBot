@@ -1,7 +1,7 @@
 # bot/models.py
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 
 from bot.config import MANAGER_TELEGRAM_IDS
@@ -66,3 +66,12 @@ class Stock(Base):
 
     product = relationship("Product", back_populates="stocks")
     user = relationship("User", back_populates="stocks")
+
+class Log(Base):
+    __tablename__ = "logs"
+
+    id        = Column(Integer, primary_key=True)
+    timestamp = Column(DateTime, default=datetime.now)
+    action    = Column(String(64))     # "add", "writeoff", "transfer", ...
+    user_id   = Column(String(64))     # Telegram ID
+    info      = Column(Text)           # что произошло
