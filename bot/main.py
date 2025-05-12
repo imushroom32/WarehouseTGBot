@@ -1,7 +1,6 @@
 from telegram.ext import Application
 
 from bot.config import TELEGRAM_TOKEN
-from bot.db import init_db
 from bot.handlers.delete_product import get_handler as delete_product_h
 from bot.handlers.product import get_handler as product_h
 from bot.handlers.start import get_handlers as start_handlers
@@ -10,6 +9,7 @@ from bot.handlers.stock_list import get_handler as stock_list_h
 from bot.handlers.transfer_stock import get_handler as transfer_h
 from bot.handlers.writeoff import get_handler as writeoff_h
 from bot.handlers.report import get_handler as report_h
+from bot.db import init_db
 
 
 

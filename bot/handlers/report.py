@@ -1,48 +1,106 @@
-from telegram import Update
-from telegram.ext import CallbackQueryHandler, ConversationHandler, ContextTypes, MessageHandler, filters
+from datetime import datetime, timedelta
+
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    CallbackQueryHandler, ConversationHandler, MessageHandler,
+    ContextTypes, filters
+)
 
 from bot.db import Session
 from bot.models import Log
 from bot.keyboards import home_kb
 
-ASK_START, ASK_END = range(2)
+CHOOSE_PERIOD, ASK_DAYS = range(2)
 
-async def start_report(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
-    q = update.callback_query
-    await q.answer()
-    await q.edit_message_text("📅 Введите дату начала (в формате ГГГГ-ММ-ДД):")
-    return ASK_START
+def _build_period_kb():
+    kb = [
+        [InlineKeyboardButton("🗓 За неделю", callback_data="week"),
+         InlineKeyboardButton("📅 За месяц", callback_data="month")],
+        [InlineKeyboardButton("⌨ Указать кол-во дней", callback_data="manual")],
+        [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
+    ]
+    return InlineKeyboardMarkup(kb)
 
-async def ask_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
-    ctx.user_data["report_start"] = update.message.text.strip()
-    await update.message.reply_text("📅 Теперь введите дату конца (в формате ГГГГ-ММ-ДД):")
-    return ASK_END
 
-async def ask_end(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
-    start = ctx.user_data["report_start"]
-    end = update.message.text.strip()
+async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text("📄 Выберите период для отчёта:", reply_markup=_build_period_kb())
+    return CHOOSE_PERIOD
 
+
+async def choose_period(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.callback_query.answer()
+    choice = update.callback_query.data
+    now = datetime.now()
+
+    if choice == "week":
+        start = now - timedelta(days=7)
+        return await _generate_and_send_report(update, context, start, now)
+
+    if choice == "month":
+        start = now - timedelta(days=30)
+        return await _generate_and_send_report(update, context, start, now)
+
+    if choice == "manual":
+        await update.callback_query.edit_message_text("⌨ Введите количество дней в прошлое (1-365):")
+        return ASK_DAYS
+
+    return ConversationHandler.END
+
+
+async def ask_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    try:
+        days = int(update.message.text.strip())
+        if days <= 0 or days > 365:
+            raise ValueError
+    except ValueError:
+        await update.message.reply_text("❌ Введите целое число от 1 до 365.")
+        return ConversationHandler.END
+
+    now = datetime.now()
+    start = now - timedelta(days=days)
+    return await _generate_and_send_report(update, context, start, now)
+
+
+async def _generate_and_send_report(update: Update, context: ContextTypes.DEFAULT_TYPE, start: datetime, end: datetime) -> int:
     session = Session()
     rows = session.query(Log).filter(Log.timestamp.between(start, end)).order_by(Log.timestamp).all()
     session.close()
 
     if not rows:
-        await update.message.reply_text("❗ За указанный период действий не найдено.", reply_markup=home_kb())
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="📄 За указанный период действий не найдено.",
+            reply_markup=home_kb()
+        )
         return ConversationHandler.END
 
-    out = ["📄 <b>Отчёт</b>\n"]
-    for log in rows:
-        out.append(f"🕒 <i>{log.timestamp.strftime('%Y-%m-%d %H:%M')}</i>\n👤 <code>{log.user_id}</code>\n🔧 {log.action}\n📝 {log.info}\n")
+    # Формируем таблицу в моноширинном формате
+    header = f"{'Время':<17} | {'Действие':<12} | {'Пользователь':<10} | Детали"
+    line = "-" * 70
+    out = ["<pre>" + header, line]
 
-    await update.message.reply_text("\n".join(out), parse_mode="HTML", reply_markup=home_kb())
+    for log in rows:
+        out.append(f"{log.timestamp.strftime('%Y-%m-%d %H:%M')} | {log.action:<12} | {log.user_id:<10} | {log.info}")
+
+    out.append("</pre>")
+    chunks = ["\n".join(out[i:i+40]) for i in range(0, len(out), 40)]
+    for chunk in chunks:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=chunk,
+            parse_mode="HTML"
+        )
+
     return ConversationHandler.END
+
 
 def get_handler() -> ConversationHandler:
     return ConversationHandler(
         entry_points=[CallbackQueryHandler(start_report, pattern="^report$")],
         states={
-            ASK_START: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_start)],
-            ASK_END:   [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_end)],
+            CHOOSE_PERIOD: [CallbackQueryHandler(choose_period, pattern="^(week|month|manual)$")],
+            ASK_DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_days)],
         },
         fallbacks=[],
     )
