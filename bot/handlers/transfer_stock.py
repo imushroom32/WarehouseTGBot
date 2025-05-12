@@ -146,7 +146,11 @@ async def enter_qty(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     session.commit()
     session.close()
 
-    await update.message.reply_text("✅ Передача выполнена.", reply_markup=home_kb())
+    if update.message:
+        await update.message.reply_text("✅ Передача выполнена.", reply_markup=home_kb())
+    else:
+        await update.effective_chat.send_message("✅ Передача выполнена.", reply_markup=home_kb())
+
     return ConversationHandler.END
 
 
