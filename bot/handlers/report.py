@@ -1,3 +1,4 @@
+import html
 from datetime import datetime, timedelta
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -77,9 +78,7 @@ async def ask_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         await update.effective_chat.send_message("❌ Ошибка при вводе периода.", reply_markup=home_kb())
         return ConversationHandler.END
 
-
-async def _generate_and_send_report(update: Update, context: ContextTypes.DEFAULT_TYPE, start: datetime,
-                                    end: datetime) -> int:
+async def _generate_and_send_report(update: Update, context: ContextTypes.DEFAULT_TYPE, start: datetime, end: datetime) -> int:
     try:
         session = Session()
         rows = session.query(Log).filter(Log.timestamp.between(start, end)).order_by(Log.timestamp).all()
@@ -93,21 +92,17 @@ async def _generate_and_send_report(update: Update, context: ContextTypes.DEFAUL
             )
             return ConversationHandler.END
 
-        # Формируем таблицу в моноширинном формате
-        header = f"{'Время':<17} | {'Действие':<12} | {'Пользователь':<10} | Детали"
-        line = "-" * 70
-        out = ["<pre>" + header, line]
-
+        lines = []
         for log in rows:
-            out.append(
-                f"{log.timestamp.strftime('%Y-%m-%d %H:%M')} | {log.action:<12} | {log.user_id:<10} | {log.info}")
+            line = f"{log.timestamp.strftime('%Y-%m-%d %H:%M')} | {log.action:<12} | {log.user_id:<10} | {log.info}"
+            lines.append(html.escape(line))  # экранируем спецсимволы
 
-        out.append("</pre>")
-        chunks = ["\n".join(out[i:i + 40]) for i in range(0, len(out), 40)]
+        chunks = ["\n".join(lines[i:i + 40]) for i in range(0, len(lines), 40)]
+
         for chunk in chunks:
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=chunk,
+                text=f"<pre>{chunk}</pre>",
                 parse_mode="HTML"
             )
 
