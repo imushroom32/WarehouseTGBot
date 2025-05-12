@@ -1,44 +1,22 @@
-# start.py (обновлённая версия с регистрацией пользователей и защитой от сбоев)
-from telegram import Update
-from telegram.error import BadRequest
-from telegram.ext import (
-    CommandHandler,
-    CallbackQueryHandler,
-)
-from telegram.ext import ContextTypes
+# bot/handlers/start.py
+"""
+Главное меню
+"""
 
-from bot.db import Session
+from telegram import Update
+from telegram.ext import (
+    ContextTypes,
+    CallbackQueryHandler,
+    ConversationHandler,
+    CommandHandler,
+)
 from bot.keyboards import main_menu_markup
+from bot.db import Session
 from bot.models import User
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    try:
-        session = Session()
-        user = User.get_or_create(session, update.effective_user)
-        role = user.role
-        session.close()
-
-        markup = main_menu_markup(role)
-
-        if update.callback_query:
-            await update.callback_query.answer()
-            try:
-                await update.callback_query.edit_message_text("👋 Главное меню:", reply_markup=markup)
-            except BadRequest as e:
-                if "Message is not modified" not in str(e):
-                    raise
-        elif update.message:
-            await update.message.reply_text("👋 Главное меню:", reply_markup=markup)
-        else:
-            await update.effective_chat.send_message("👋 Главное меню:", reply_markup=markup)
-
-    except Exception as e:
-        print("‼️ ОШИБКА В start:", e)
-        try:
-            await update.effective_chat.send_message("❌ Ошибка при открытии меню.")
-        except Exception:
-            pass
+def get_handler() -> CallbackQueryHandler:
+    return CallbackQueryHandler(start, pattern="^start$")
 
 
 def get_handlers():
@@ -46,3 +24,43 @@ def get_handlers():
         CommandHandler("start", start),
         CallbackQueryHandler(start, pattern="^main_menu$"),
     ]
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    try:
+        context.user_data.clear()
+
+        telegram_id = str(update.effective_user.id)
+        session = Session()
+        user = session.query(User).filter_by(telegram_id=telegram_id).first()
+        session.close()
+
+        if not user:
+            await update.effective_chat.send_message("❌ Вы не зарегистрированы в системе.")
+            return ConversationHandler.END
+
+        kb = main_menu_markup(user.role)
+
+        if update.callback_query:
+            query = update.callback_query
+            await query.answer()
+
+            try:
+                await query.message.edit_text("🏠 Главное меню", reply_markup=kb)
+            except Exception as e:
+                print("‼️ Не удалось отредактировать сообщение:", e)
+                try:
+                    await query.message.delete()
+                except:
+                    pass
+                await update.effective_chat.send_message("🏠 Главное меню", reply_markup=kb)
+
+        elif update.message:
+            await update.message.reply_text("🏠 Главное меню", reply_markup=kb)
+
+        return ConversationHandler.END
+
+    except Exception as e:
+        print("‼️ ОШИБКА В start:", e)
+        await update.effective_chat.send_message("❌ Ошибка при открытии меню.")
+        return ConversationHandler.END
