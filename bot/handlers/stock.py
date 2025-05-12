@@ -62,54 +62,54 @@ async def select_product(
     return ENTER_QTY
 
 
-async def enter_qty(
-        update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
-    """
-    Шаг 3: Обновляет или создаёт запись Stock.
-    """
-    text = update.message.text
-    if not text.isdigit() or int(text) <= 0:
-        await update.message.reply_text("❗ Введите положительное число!")
-        return ENTER_QTY
+async def enter_qty(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    try:
+        if not update.message:
+            await update.effective_chat.send_message("❗ Не удалось прочитать сообщение. Попробуйте ещё раз.")
+            return ConversationHandler.END
 
-    qty = int(text)
-    pid = context.user_data['pid']
-    session = Session()
-    stock = (
-        session.query(Stock)
-        .filter_by(product_id=pid, user_id=None)  # ← ключевое изменение
-        .first()
-    )
+        text = update.message.text.strip()
+        try:
+            qty = int(text)
+            if qty <= 0:
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("❗ Введите целое положительное число!")
+            return ConversationHandler.END
 
-    if stock:
-        stock.quantity += qty
-    else:
-        stock = Stock(product_id=pid, quantity=qty)  # user_id остаётся NULL
-        session.add(stock)
+        pid = ctx.user_data["pid"]
+        session = Session()
 
-    session.commit()
+        stock = session.query(Stock).filter_by(product_id=pid, user_id=None).first()
+        if stock:
+            stock.quantity += qty
+        else:
+            stock = Stock(product_id=pid, quantity=qty)
+            session.add(stock)
 
-    product = session.get(Product, pid)
-    await update.message.reply_text(
-        f"✅ {product.name}: +{qty}шт. Итого: {stock.quantity}шт."
-    )
+        product = session.get(Product, pid)
 
-    keyboard = [
-        [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Вы можете вернуться в главное меню:", reply_markup=reply_markup)
+        # логируем
+        log = Log(
+            action="add_stock",
+            user_id=str(update.effective_user.id),
+            info=f"Пополнение: {product.name} +{qty} шт. Итого: {stock.quantity} шт."
+        )
+        session.add(log)
 
-    log = Log(
-        action="add_stock",
-        user_id=str(update.effective_user.id),
-        info=f"Пополнено: {product.name} +{qty} шт. Итого: {stock.quantity} шт."
-    )
-    session.add(log)
-    session.commit()
-    session.close()
-    return ConversationHandler.END
+        session.commit()
+        session.close()
+
+        if update.message:
+            await update.message.reply_text("✅ Пополнение выполнено.", reply_markup=home_kb())
+        else:
+            await update.effective_chat.send_message("✅ Пополнение выполнено.", reply_markup=home_kb())
+
+        return ConversationHandler.END
+
+    except Exception as e:
+        print("‼️ ОШИБКА В enter_qty (stock.py):", e)
+        return ConversationHandler.END
 
 
 def get_handler() -> ConversationHandler:

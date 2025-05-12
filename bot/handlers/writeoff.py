@@ -143,7 +143,12 @@ async def enter_qty(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return ENTER_QTY
 
     ctx.user_data["writeoff_qty"] = qty
-    await update.message.reply_text("📝 Укажите причину списания:")
+
+    if update.message:
+        await update.message.reply_text("📝 Укажите причину списания:")
+    else:
+        await update.effective_chat.send_message("📝 Укажите причину списания:")
+
     return ENTER_REASON
 
 
@@ -172,7 +177,10 @@ async def enter_reason(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     log_session.commit()
     log_session.close()
 
-    await update.message.reply_text(f"✅ Списано {qty} шт. ({product_name}).", reply_markup=home_kb())
+    if update.message:
+        await update.message.reply_text(f"✅ Списано {qty} шт. ({product_name}).", reply_markup=home_kb())
+    else:
+        await update.effective_chat.send_message(f"✅ Списано {qty} шт. ({product_name}).", reply_markup=home_kb())
 
     # ── уведомление менеджеру ─────────────────────────────────────────
     try:
