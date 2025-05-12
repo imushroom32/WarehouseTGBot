@@ -190,4 +190,5 @@ def get_handler() -> ConversationHandler:
             ENTER_REASON:    [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_reason)],
         },
         fallbacks=[],
+        per_message=True  # ← ОБЯЗАТЕЛЬНО!
     )
