@@ -10,7 +10,7 @@ from telegram.ext import (
     ConversationHandler,
     CommandHandler,
 )
-from bot.keyboards import main_menu_markup
+from bot.keyboards import main_menu_markup, home_kb
 from bot.db import Session
 from bot.models import User
 
@@ -46,7 +46,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             await query.answer()
 
             try:
-                await query.message.edit_text("🏠 Главное меню", reply_markup=kb)
+                if query.message:
+                    await query.message.edit_text("🏠 Главное меню", reply_markup=kb)
+                else:
+                    await update.effective_chat.send_message("🏠 Главное меню", reply_markup=kb)
             except Exception as e:
                 print("‼️ Не удалось отредактировать сообщение:", e)
                 try:

@@ -17,8 +17,8 @@ SELECT_PRODUCT, SELECT_EMPLOYEE, ENTER_QTY = range(3)
 
 async def transfer_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     try:
-        q = update.callback_query
-        await q.answer()
+        query = update.callback_query
+        await query.answer()
 
         session = Session()
         stock_product_ids = (
@@ -31,7 +31,7 @@ async def transfer_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
 
         if not product_ids:
             session.close()
-            await q.edit_message_text("❗ Нет свободных остатков для передачи.", reply_markup=home_kb())
+            await query.edit_message_text("❗ Нет свободных остатков для передачи.", reply_markup=home_kb())
             return ConversationHandler.END
 
         products = (
@@ -43,8 +43,9 @@ async def transfer_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         session.close()
 
         kb = [[InlineKeyboardButton(p.name, callback_data=str(p.id))] for p in products]
-        await q.edit_message_text(
-            "📦 Выберите товар для передачи:", reply_markup=InlineKeyboardMarkup(kb + list(home_kb().inline_keyboard))
+        await query.edit_message_text(
+            "📦 Выберите товар для передачи:",
+            reply_markup=InlineKeyboardMarkup(kb + list(home_kb().inline_keyboard))
         )
         return SELECT_PRODUCT
 
@@ -56,10 +57,11 @@ async def transfer_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def select_product(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     try:
-        q = update.callback_query
-        await q.answer()
+        query = update.callback_query
+        await query.answer()
 
-        pid = int(q.data)
+        pid = int(query.data)
+        ctx.user_data.clear()
         ctx.user_data["product_id"] = pid
 
         session = Session()
@@ -69,12 +71,12 @@ async def select_product(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         session.close()
 
         if not users:
-            await q.edit_message_text("❗ Нет сотрудников для передачи.", reply_markup=home_kb())
+            await query.edit_message_text("❗ Нет сотрудников для передачи.", reply_markup=home_kb())
             return ConversationHandler.END
 
         kb = [[InlineKeyboardButton(u.full_name, callback_data=str(u.id))] for u in users]
-        await q.edit_message_text(
-            f"👤 Кому передать " + product.name + "?",
+        await query.edit_message_text(
+            f"👤 Кому передать {product.name}?",
             reply_markup=InlineKeyboardMarkup(kb + list(home_kb().inline_keyboard))
         )
         return SELECT_EMPLOYEE
@@ -87,11 +89,10 @@ async def select_product(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def select_employee(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     try:
-        q = update.callback_query
-        await q.answer()
+        query = update.callback_query
+        await query.answer()
 
-        ctx.user_data["employee_id"] = int(q.data)
-
+        ctx.user_data["employee_id"] = int(query.data)
         pid = ctx.user_data["product_id"]
 
         session = Session()
@@ -105,12 +106,11 @@ async def select_employee(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int
         session.close()
 
         if total == 0:
-            await q.edit_message_text("❗ Нет доступного количества для передачи.", reply_markup=home_kb())
+            await query.edit_message_text("❗ Нет доступного количества для передачи.", reply_markup=home_kb())
             return ConversationHandler.END
 
         ctx.user_data["available_qty"] = total
-
-        await q.edit_message_text(f"🔢 Сколько передать? Доступно: {total} шт.")
+        await query.edit_message_text(f"🔢 Сколько передать? Доступно: {total} шт.")
         return ENTER_QTY
 
     except Exception as e:
@@ -178,10 +178,11 @@ def get_handler() -> ConversationHandler:
     return ConversationHandler(
         entry_points=[CallbackQueryHandler(transfer_start, pattern="^transfer_stock$")],
         states={
-            SELECT_PRODUCT: [CallbackQueryHandler(select_product, pattern=r"^\d+$")],
-            SELECT_EMPLOYEE: [CallbackQueryHandler(select_employee, pattern=r"^\d+$")],
+            SELECT_PRODUCT: [CallbackQueryHandler(select_product, pattern=r"^\\d+$")],
+            SELECT_EMPLOYEE: [CallbackQueryHandler(select_employee, pattern=r"^\\d+$")],
             ENTER_QTY: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_qty)],
         },
-        fallbacks=[],
-        per_message=True  # ← нужно True, иначе одни и те же кнопки игнорируются
+        fallbacks=[CallbackQueryHandler(transfer_start, pattern="^transfer_stock$")],
+        per_message=True,
+        allow_reentry=True
     )

@@ -17,10 +17,6 @@ def main() -> None:
     init_db()
     app = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    # /start и кнопки меню
-    for h in start_handlers():
-        app.add_handler(h)
-
     # остальные модули
     app.add_handler(product_h())
     app.add_handler(stock_add_h())
