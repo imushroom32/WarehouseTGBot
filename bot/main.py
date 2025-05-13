@@ -1,6 +1,7 @@
 from telegram.ext import Application
 
 from bot.config import TELEGRAM_TOKEN
+from bot.handlers.join_approve import get_handler as join_approve_h
 from bot.handlers.delete_product import get_handler as delete_product_h
 from bot.handlers.product import get_handler as product_h
 from bot.handlers.start import get_handlers as start_handlers
@@ -25,6 +26,7 @@ def main() -> None:
     app.add_handler(delete_product_h())
     app.add_handler(transfer_h())
     app.add_handler(report_h())
+    app.add_handler(join_approve_h())
 
     for h in start_handlers():
         app.add_handler(h)

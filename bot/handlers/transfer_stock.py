@@ -9,6 +9,7 @@ from telegram.ext import (
     ContextTypes, ConversationHandler, CallbackQueryHandler, MessageHandler, filters
 )
 from bot.db import Session
+from bot.handlers.stock import back_to_menu
 from bot.keyboards import home_kb
 from bot.models import Product, Stock, User, Log
 
@@ -178,11 +179,10 @@ def get_handler() -> ConversationHandler:
     return ConversationHandler(
         entry_points=[CallbackQueryHandler(transfer_start, pattern="^transfer_stock$")],
         states={
-            SELECT_PRODUCT: [CallbackQueryHandler(select_product, pattern=r"^\\d+$")],
-            SELECT_EMPLOYEE: [CallbackQueryHandler(select_employee, pattern=r"^\\d+$")],
+            SELECT_PRODUCT: [CallbackQueryHandler(select_product, pattern=r"^\d+$")],
+            SELECT_EMPLOYEE: [CallbackQueryHandler(select_employee, pattern=r"^\d+$")],
             ENTER_QTY: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_qty)],
         },
-        fallbacks=[CallbackQueryHandler(transfer_start, pattern="^transfer_stock$")],
-        per_message=True,
-        allow_reentry=True
+        fallbacks=[CallbackQueryHandler(back_to_menu, pattern="^main_menu$")],
+        allow_reentry=True  # достаточно одного флага
     )

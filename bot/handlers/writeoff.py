@@ -28,6 +28,7 @@ from bot.models import User, Product, Stock, Log
 # ── состояния ────────────────────────────────────────────────────────────────
 CHOOSE_EMPLOYEE, CHOOSE_PRODUCT, ENTER_QTY, ENTER_REASON = range(4)
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 async def writeoff_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     """Точка входа: определяем, чьи остатки будем списывать."""
@@ -82,6 +83,7 @@ async def writeoff_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         await update.effective_chat.send_message("❌ Ошибка при выборе источника.", reply_markup=home_kb())
         return ConversationHandler.END
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 async def select_employee(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     try:
@@ -95,6 +97,7 @@ async def select_employee(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int
         print("‼️ ОШИБКА В select_employee:", e)
         await update.effective_chat.send_message("❌ Ошибка при выборе сотрудника.", reply_markup=home_kb())
         return ConversationHandler.END
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 async def _show_products(query, ctx) -> int:
@@ -133,6 +136,7 @@ async def _show_products(query, ctx) -> int:
         await query.message.reply_text("❌ Ошибка при загрузке товаров.", reply_markup=home_kb())
         return ConversationHandler.END
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 async def select_product(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     try:
@@ -155,6 +159,7 @@ async def select_product(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         await update.effective_chat.send_message("❌ Ошибка при выборе товара.", reply_markup=home_kb())
         return ConversationHandler.END
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 async def enter_qty(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     try:
@@ -170,6 +175,7 @@ async def enter_qty(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
             f"❗ Введите число от 1 до {ctx.user_data.get('available_qty', '?')}"
         )
         return ENTER_QTY
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 async def enter_reason(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
@@ -214,6 +220,7 @@ async def enter_reason(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         await update.effective_chat.send_message("❌ Ошибка при списании.", reply_markup=home_kb())
         return ConversationHandler.END
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 def get_handler() -> ConversationHandler:
@@ -221,11 +228,10 @@ def get_handler() -> ConversationHandler:
         entry_points=[CallbackQueryHandler(writeoff_start, pattern="^write_off$")],
         states={
             CHOOSE_EMPLOYEE: [CallbackQueryHandler(select_employee, pattern=r"^\d+$|^unassigned$")],
-            CHOOSE_PRODUCT:  [CallbackQueryHandler(select_product,  pattern=r"^\d+$")],
-            ENTER_QTY:       [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_qty)],
-            ENTER_REASON:    [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_reason)],
+            CHOOSE_PRODUCT: [CallbackQueryHandler(select_product, pattern=r"^\d+$")],
+            ENTER_QTY: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_qty)],
+            ENTER_REASON: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_reason)],
         },
         fallbacks=[CallbackQueryHandler(writeoff_start, pattern="^write_off$")],
-        per_message=True,
-        allow_reentry=True,
+        allow_reentry=True,  # ← этого достаточно
     )

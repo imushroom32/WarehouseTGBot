@@ -75,3 +75,11 @@ class Log(Base):
     action    = Column(String(64))     # "add", "writeoff", "transfer", ...
     user_id   = Column(String(64))     # Telegram ID
     info      = Column(Text)           # что произошло
+
+class JoinRequest(Base):
+    __tablename__ = "join_requests"
+
+    id = Column(Integer, primary_key=True)
+    telegram_id = Column(String(64), unique=True, nullable=False)
+    full_name = Column(String(128))
+    created_at = Column(DateTime, default=datetime.now)
